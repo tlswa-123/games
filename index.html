@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>人物展示</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #1a1a2e;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    color: #fff;
+    overflow: hidden;
+  }
+  .container {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 24px;
+  }
+  .video-wrapper {
+    position: relative;
+    width: 440px;
+    height: 512px;
+    border-radius: 20px;
+    overflow: hidden;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.5), 0 0 40px rgba(234,88,12,0.15);
+    background: #000;
+  }
+  canvas {
+    width: 100%;
+    height: 100%;
+    display: block;
+  }
+  .status-badge {
+    position: absolute;
+    top: 16px;
+    right: 16px;
+    z-index: 10;
+    background: rgba(0,0,0,0.6);
+    backdrop-filter: blur(10px);
+    padding: 6px 14px;
+    border-radius: 20px;
+    font-size: 13px;
+    font-weight: 500;
+    letter-spacing: 0.5px;
+    border: 1px solid rgba(255,255,255,0.1);
+    transition: all 0.4s ease;
+  }
+  .status-badge.idle { border-color: rgba(100,200,100,0.3); color: #8fdf8f; }
+  .status-badge.speak { border-color: rgba(234,88,12,0.5); color: #f97316; }
+  .status-badge.nod { border-color: rgba(96,165,250,0.5); color: #60a5fa; }
+  .status-badge.transitioning { border-color: rgba(255,255,255,0.2); color: rgba(255,255,255,0.5); }
+  .controls {
+    display: flex;
+    gap: 16px;
+  }
+  .btn {
+    padding: 12px 32px;
+    border: 2px solid rgba(255,255,255,0.15);
+    border-radius: 12px;
+    background: rgba(255,255,255,0.06);
+    color: #ccc;
+    font-size: 15px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.25s ease;
+    backdrop-filter: blur(10px);
+    letter-spacing: 1px;
+    user-select: none;
+  }
+  .btn:hover {
+    background: rgba(255,255,255,0.12);
+    border-color: rgba(255,255,255,0.3);
+    transform: translateY(-1px);
+  }
+  .btn.active {
+    background: rgba(234,88,12,0.2);
+    border-color: #ea580c;
+    color: #f97316;
+    box-shadow: 0 0 20px rgba(234,88,12,0.2);
+  }
+  .btn.active:hover {
+    background: rgba(234,88,12,0.3);
+  }
+  .btn.disabled {
+    opacity: 0.4;
+    pointer-events: none;
+  }
+  .hint {
+    font-size: 12px;
+    color: rgba(255,255,255,0.3);
+    margin-top: -8px;
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="video-wrapper">
+    <canvas id="canvas" width="880" height="1024"></canvas>
+    <div class="status-badge idle" id="statusBadge">IDLE</div>
+  </div>
+  <div class="controls">
+    <button class="btn active" data-action="idle" onclick="switchAction('idle')">待机</button>
+    <button class="btn" data-action="speak" onclick="switchAction('speak')">说话</button>
+    <button class="btn" data-action="nod" onclick="switchAction('nod')">点头</button>
+  </div>
+  <div class="hint">点击切换动作 · 自动寻找最佳过渡时机</div>
+</div>
+
+<script>
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+const badge = document.getElementById('statusBadge');
+const buttons = document.querySelectorAll('.btn');
+
+const VIDEO_W = 880;
+const VIDEO_H = 1024;
+
+const actionLabels = { idle: 'IDLE', speak: 'SPEAK', nod: 'NOD' };
+
+// Video pool: each action has its own video element
+const videos = {};
+const videoReady = {};
+
+function loadVideo(action) {
+  return new Promise((resolve) => {
+    const v = document.createElement('video');
+    v.loop = true;
+    v.muted = true;
+    v.playsInline = true;
+    v.preload = 'auto';
+    v.src = action + '_loop.mp4';
+    v.oncanplaythrough = () => {
+      videoReady[action] = true;
+      resolve(v);
+    };
+    v.onerror = () => {
+      console.error('Failed to load', action);
+      resolve(v);
+    };
+    videos[action] = v;
+    v.load();
+  });
+}
+
+// Preload all videos
+Promise.all(['idle', 'speak', 'nod'].map(loadVideo)).then(() => {
+  videos.idle.play();
+  currentAction = 'idle';
+  requestAnimationFrame(render);
+});
+
+let currentAction = 'idle';
+let switching = false;
+let pendingAction = null;
+
+// Transition state
+let blendFrom = null;  // video element we're transitioning FROM
+let blendTo = null;    // video element we're transitioning TO
+let blendAlpha = 0;    // 0 = fully from, 1 = fully to
+const BLEND_SPEED = 0.04;  // alpha increment per frame (~0.7s transition at 60fps)
+
+function switchAction(action) {
+  if (action === currentAction || switching) return;
+  if (!videoReady[action]) return;
+
+  switching = true;
+  pendingAction = action;
+
+  // Update buttons
+  buttons.forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.action === action);
+  });
+
+  badge.className = 'status-badge transitioning';
+  badge.textContent = actionLabels[action] + '...';
+
+  // Find the nearest "neutral" point in the current video
+  // In pendulum videos, neutral points are near the start (frame 0) or end (last frame)
+  // The video duration represents one full pendulum cycle
+  const currentVid = videos[currentAction];
+  const duration = currentVid.duration;
+  const current = currentVid.currentTime;
+
+  // Calculate how close we are to frame 0 or the end
+  const distToStart = current;
+  const distToEnd = duration - current;
+  const minDist = Math.min(distToStart, distToEnd);
+
+  // If we're within 0.3s of a neutral point, switch immediately
+  // Otherwise, seek to the nearest neutral point first
+  if (minDist < 0.3) {
+    startTransition(action);
+  } else {
+    // Seek to the closest neutral point for a smooth transition
+    const targetTime = distToStart < distToEnd ? 0 : duration - 0.01;
+    currentVid.currentTime = targetTime;
+    // Wait a tiny bit for the seek to complete
+    currentVid.onseeked = () => {
+      currentVid.onseeked = null;
+      startTransition(action);
+    };
+  }
+}
+
+function startTransition(action) {
+  const fromVid = videos[currentAction];
+  const toVid = videos[action];
+
+  // Start the new video from the beginning (neutral frame)
+  toVid.currentTime = 0;
+  toVid.play();
+
+  blendFrom = fromVid;
+  blendTo = toVid;
+  blendAlpha = 0;
+}
+
+function render() {
+  // Handle blend transition
+  if (blendFrom && blendTo) {
+    blendAlpha += BLEND_SPEED;
+
+    if (blendAlpha >= 1) {
+      // Transition complete
+      blendAlpha = 1;
+
+      // Stop old video
+      blendFrom.pause();
+
+      currentAction = pendingAction;
+      switching = false;
+      pendingAction = null;
+      blendFrom = null;
+      blendTo = null;
+
+      badge.className = 'status-badge ' + currentAction;
+      badge.textContent = actionLabels[currentAction];
+    }
+  }
+
+  // Draw to canvas
+  ctx.clearRect(0, 0, VIDEO_W, VIDEO_H);
+
+  if (blendFrom && blendTo) {
+    // Crossfade rendering
+    ctx.globalAlpha = 1;
+    ctx.drawImage(blendFrom, 0, 0, VIDEO_W, VIDEO_H);
+    ctx.globalAlpha = blendAlpha;
+    ctx.drawImage(blendTo, 0, 0, VIDEO_W, VIDEO_H);
+    ctx.globalAlpha = 1;
+  } else {
+    // Normal playback
+    const vid = videos[currentAction];
+    ctx.drawImage(vid, 0, 0, VIDEO_W, VIDEO_H);
+  }
+
+  requestAnimationFrame(render);
+}
+</script>
+</body>
+</html>
