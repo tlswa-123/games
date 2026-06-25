@@ -30,8 +30,8 @@
     height: 512px;
     border-radius: 20px;
     overflow: hidden;
-    box-shadow: 0 20px 60px rgba(0,0,0,0.5), 0 0 40px rgba(234,88,12,0.15);
-    background: #000;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+    background: #1a1a2e;
   }
   canvas {
     width: 100%;
@@ -43,8 +43,9 @@
     top: 16px;
     right: 16px;
     z-index: 10;
-    background: rgba(0,0,0,0.6);
+    background: rgba(0,0,0,0.5);
     backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
     padding: 6px 14px;
     border-radius: 20px;
     font-size: 13px;
@@ -74,6 +75,7 @@
     cursor: pointer;
     transition: all 0.25s ease;
     backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
     letter-spacing: 1px;
     user-select: none;
   }
@@ -119,7 +121,7 @@
     <button class="btn nod" data-action="nod">点头</button>
     <button class="btn shake" data-action="shake">摇头</button>
   </div>
-  <div class="hint">点击切换动作 · 视频自动循环播放</div>
+  <div class="hint">点击切换动作 · 背景已抠除 · 自动循环</div>
 </div>
 
 <script>
@@ -152,7 +154,6 @@ videoList.forEach(function(action) {
   });
   v.addEventListener('error', function() {
     console.error('Failed to load:', action, v.error);
-    // Still try to start if at least idle is ready
     readyCount++;
     if (readyCount === totalVideos && videos.idle.readyState >= 2) start();
   });
@@ -218,7 +219,7 @@ function render() {
   ctx.clearRect(0, 0, W, H);
   
   if (blendFrom && blendTo) {
-    ctx.globalAlpha = 1;
+    ctx.globalAlpha = 1 - blendAlpha;
     ctx.drawImage(blendFrom, 0, 0, W, H);
     ctx.globalAlpha = blendAlpha;
     ctx.drawImage(blendTo, 0, 0, W, H);
