@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<title>透明底动画预览</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { background: #1a1a2e; color: #eee; font-family: -apple-system, BlinkMacSystemFont, sans-serif; padding: 20px; }
+h1 { text-align: center; margin-bottom: 20px; font-size: 20px; }
+.preview-container { display: flex; flex-wrap: wrap; gap: 30px; justify-content: center; }
+.preview-item { text-align: center; }
+.preview-item h2 { font-size: 16px; margin-bottom: 10px; color: #ea580c; }
+.checkerboard {
+  background-image:
+    linear-gradient(45deg, #555 25%, transparent 25%),
+    linear-gradient(-45deg, #555 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, #555 75%),
+    linear-gradient(-45deg, transparent 75%, #555 75%);
+  background-size: 30px 30px;
+  background-position: 0 0, 0 15px, 15px -15px, -15px 0px;
+  background-color: #333;
+  display: inline-block;
+  padding: 10px;
+  border-radius: 8px;
+}
+.checkerboard img { max-height: 400px; display: block; }
+.info { margin-top: 8px; font-size: 12px; color: #999; }
+</style>
+</head>
+<body>
+<h1>透明底动画预览（棋盘格 = 透明区域）</h1>
+<div class="preview-container">
+  <div class="preview-item">
+    <h2>摸下巴</h2>
+    <div class="checkerboard"><img src="final_touch_chin.apng" alt="touch_chin"></div>
+    <div class="info">APNG · 1244×1660 · 241帧</div>
+  </div>
+  <div class="preview-item">
+    <h2>撩头发</h2>
+    <div class="checkerboard"><img src="final_brush_hair.apng" alt="brush_hair"></div>
+    <div class="info">APNG · 1244×1660 · 241帧</div>
+  </div>
+  <div class="preview-item">
+    <h2>待机1</h2>
+    <div class="checkerboard"><img src="final_idle1.apng" alt="idle1"></div>
+    <div class="info">APNG · 404×720 · 481帧</div>
+  </div>
+  <div class="preview-item">
+    <h2>待机2</h2>
+    <div class="checkerboard"><img src="final_idle2.apng" alt="idle2"></div>
+    <div class="info">APNG · 404×720 · 481帧</div>
+  </div>
+</div>
+</body>
+</html>
